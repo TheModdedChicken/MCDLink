@@ -1,4 +1,4 @@
-package org.loganshaw.mcdlink.util;
+package org.loganshaw.mcdlink.util.managers;
 
 import org.bukkit.ChatColor;
 

@@ -1,23 +1,17 @@
-package org.loganshaw.mcdlink.util;
+package org.loganshaw.mcdlink.util.managers;
 
-import org.bukkit.Bukkit;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.intent.Intent;
 import org.javacord.api.entity.message.MessageFlag;
-import org.javacord.api.event.interaction.SlashCommandCreateEvent;
 import org.javacord.api.interaction.*;
-import org.javacord.api.listener.GloballyAttachableListener;
 import org.loganshaw.mcdlink.MCDLink;
+import org.loganshaw.mcdlink.util.DiscordCommand;
+import org.loganshaw.mcdlink.util.TempPlayerLink;
 
-import java.io.File;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /*
 Javacord Documentation: https://javacord.org/wiki/
@@ -136,13 +130,42 @@ public class DiscordManager {
                 ),
                 event -> {
                     SlashCommandInteraction interaction = event.getSlashCommandInteraction();
-
                     String subCommand = interaction.getFullCommandName().split(" ", 0)[1];
-                    switch (subCommand) {
-                        case "java" ->
-                                logger.info("JAVA!!!!!! " + interaction.getArgumentStringValueByName("username"));
-                        case "bedrock" ->
-                                logger.info("BEDROCK!!!!!! " + interaction.getArgumentStringValueByName("username"));
+
+                    long user_id = interaction.getUser().getId();
+                    String mc_username = interaction.getArgumentStringValueByName("username").orElse("");
+
+                    // Check if user is already trying to link an account
+                    if (plugin.minecraftManager.tempPlayerLinks.containsKey(user_id)) {
+                        TempPlayerLink tpl = plugin.minecraftManager.tempPlayerLinks.get(user_id);
+                        boolean isJava = tpl.java_username != null;
+                        String username = isJava ? tpl.java_username : tpl.bedrock_username;
+                        String platform = isJava ? "Java" : "Bedrock";
+
+                        interaction.createImmediateResponder()
+                                .setContent("You're already trying to link `" + username + "` on " + platform + ".")
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
+                    }
+                    else {
+                        interaction.respondLater(true)
+                                .thenAccept(interactionUpdater -> {
+                                    try {
+                                        String link_id = plugin.minecraftManager.addTempPlayerLink(
+                                                user_id,
+                                                Objects.equals(subCommand, "java") ? mc_username : ("." + mc_username)
+                                        );
+
+                                        interactionUpdater
+                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + mc_username + "`)")
+                                                .update();
+                                    } catch (Exception err) {
+                                        interactionUpdater
+                                                .setContent(err.getMessage())
+                                                .update();
+                                    }
+                                });
+
                     }
                 }
         ));

@@ -1,5 +1,6 @@
 package org.loganshaw.mcdlink;
 
+import java.sql.SQLException;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -9,13 +10,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.loganshaw.mcdlink.util.DiscordManager;
-import org.loganshaw.mcdlink.util.MinecraftManager;
+import org.loganshaw.mcdlink.util.managers.DatabaseManager;
+import org.loganshaw.mcdlink.util.managers.DiscordManager;
+import org.loganshaw.mcdlink.util.managers.MinecraftManager;
 
 public class MCDLink extends JavaPlugin implements Listener {
 
     public DiscordManager discordManager;
     public MinecraftManager minecraftManager;
+    public DatabaseManager databaseManager;
     public MCDLink plugin;
     public Logger logger;
     public ConsoleCommandSender console;
@@ -38,6 +41,12 @@ public class MCDLink extends JavaPlugin implements Listener {
         };
 
         minecraftManager = new MinecraftManager(plugin);
+
+        try {
+            databaseManager = new DatabaseManager(plugin);
+        } catch (ClassNotFoundException | SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         Bukkit.getPluginManager().registerEvents(this, this);
     }
