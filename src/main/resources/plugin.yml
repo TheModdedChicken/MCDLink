@@ -7,3 +7,12 @@ website: https://loganshaw.org
 api-version: '1.20'
 softdepend:
   - floodgate
+commands:
+  mcd-link:
+    description: Link your Discord account
+    usage: /<command> <code>
+    permission: mcdlink.link
+  mcd-unlink:
+    description: Unlink your Discord account
+    usage: /<command>
+    permission: mcdlink.unlink

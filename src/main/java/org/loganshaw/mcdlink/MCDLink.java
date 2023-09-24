@@ -1,8 +1,7 @@
 package org.loganshaw.mcdlink;
 
-import java.util.HashMap;
+import java.util.logging.Logger;
 
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -11,11 +10,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.loganshaw.mcdlink.util.DiscordManager;
+import org.loganshaw.mcdlink.util.MinecraftManager;
 
 public class MCDLink extends JavaPlugin implements Listener {
 
-    public DiscordManager client;
+    public DiscordManager discordManager;
+    public MinecraftManager minecraftManager;
     public MCDLink plugin;
+    public Logger logger;
     public ConsoleCommandSender console;
     public FileConfiguration config;
 
@@ -25,21 +27,24 @@ public class MCDLink extends JavaPlugin implements Listener {
 
         plugin = this;
         config = getConfig();
+        logger = getLogger();
         console = Bukkit.getServer().getConsoleSender();
 
-        String bot_token = config.getString("bot_token");
-        long guild_id = config.getLong("guild_id");
-        if (bot_token != null) {
-            client = new DiscordManager(bot_token, guild_id, plugin);
+        try {
+            discordManager = new DiscordManager(plugin);
+        } catch (Exception err) {
+            logger.severe(err.getMessage());
+            return;
+        };
 
-            Bukkit.getPluginManager().registerEvents(this, this);
-        }
-        else console.sendMessage("Invalid Discord bot token");
+        minecraftManager = new MinecraftManager(plugin);
+
+        Bukkit.getPluginManager().registerEvents(this, this);
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        event.getPlayer().sendMessage(Component.text("Hello, " + event.getPlayer().getName() + "!"));
+        minecraftManager.onPlayerJoin(event);
     }
 
 }

@@ -25,7 +25,7 @@ public class DiscordCommand {
     }
 
     /**
-     * Stores a Discord command with options
+     * Stores a Discord command with an option
      * @param description Command description
      * @param option Command option
      * @param operation Function to execute when called

@@ -1,6 +1,8 @@
 package org.loganshaw.mcdlink.util;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
@@ -25,30 +27,38 @@ public class DiscordManager {
     DiscordApi api;
     MCDLink plugin;
     Logger logger;
-    File linksFile;
-    YamlConfiguration links;
+    FileConfiguration config;
 
-    long application_id;
     long guild_id;
 
-    public DiscordManager (String token, long guild_id, MCDLink plugin) {
+    public DiscordManager (MCDLink plugin) throws Exception {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.api = new DiscordApiBuilder()
-                .setToken(token)
-                .setIntents(Intent.MESSAGE_CONTENT)
-                .login().join();
+        this.config = plugin.config;
 
-        registerCommands();
+        String bot_token = this.config.getString("bot_token");
+        this.guild_id = this.config.getLong("guild_id");
+        if (bot_token != null) {
 
-        // Listen for, and execute, Discord command calls
-        api.addSlashCommandCreateListener(event -> {
-            SlashCommandInteraction slashCommandInteraction = event.getSlashCommandInteraction();
-            commands.get(slashCommandInteraction.getCommandName()).operation.Operation(event);
-        });
+            this.api = new DiscordApiBuilder()
+                    .setToken(bot_token)
+                    .setIntents(Intent.MESSAGE_CONTENT)
+                    .login().join();
 
-        this.linksFile = new File(plugin.getDataFolder(), "links.yml");
-        this.links = YamlConfiguration.loadConfiguration(this.linksFile);
+            registerCommands();
+
+            // Listen for, and execute, Discord command calls
+            api.addSlashCommandCreateListener(event -> {
+                SlashCommandInteraction slashCommandInteraction = event.getSlashCommandInteraction();
+                commands.get(slashCommandInteraction.getCommandName()).operation.Operation(event);
+            });
+
+        }
+        else {
+            String msg = "Invalid Discord bot token.";
+            logger.severe(msg);
+            throw new Exception(msg);
+        };
     }
 
     /**
