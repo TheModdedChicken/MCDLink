@@ -8,6 +8,8 @@ import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.interaction.*;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.util.DiscordCommand;
+import org.loganshaw.mcdlink.util.MinecraftUsername;
+import org.loganshaw.mcdlink.util.MinecraftUsernameType;
 import org.loganshaw.mcdlink.util.TempPlayerLink;
 
 import java.util.*;
@@ -133,17 +135,18 @@ public class DiscordManager {
                     String subCommand = interaction.getFullCommandName().split(" ", 0)[1];
 
                     long user_id = interaction.getUser().getId();
-                    String mc_username = interaction.getArgumentStringValueByName("username").orElse("");
+                    MinecraftUsername username = new MinecraftUsername(
+                            (Objects.equals(subCommand, "bedrock") ? "." : "")
+                            + interaction.getArgumentStringValueByName("username").orElse("")
+                    );
 
                     // Check if user is already trying to link an account
-                    if (plugin.minecraftManager.tempPlayerLinks.containsKey(user_id)) {
-                        TempPlayerLink tpl = plugin.minecraftManager.tempPlayerLinks.get(user_id);
-                        boolean isJava = tpl.java_username != null;
-                        String username = isJava ? tpl.java_username : tpl.bedrock_username;
-                        String platform = isJava ? "Java" : "Bedrock";
+                    TempPlayerLink tpl = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
+                    if (tpl != null) {
+                        String platform = tpl.mc_username.getType() == MinecraftUsernameType.JAVA ? "Java" : "Bedrock";
 
                         interaction.createImmediateResponder()
-                                .setContent("You're already trying to link `" + username + "` on " + platform + ".")
+                                .setContent("You're already trying to link `" + tpl.mc_username.getUsername() + "` on " + platform + ".")
                                 .setFlags(MessageFlag.EPHEMERAL)
                                 .respond();
                     }
@@ -151,13 +154,10 @@ public class DiscordManager {
                         interaction.respondLater(true)
                                 .thenAccept(interactionUpdater -> {
                                     try {
-                                        String link_id = plugin.minecraftManager.addTempPlayerLink(
-                                                user_id,
-                                                Objects.equals(subCommand, "java") ? mc_username : ("." + mc_username)
-                                        );
+                                        String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, username);
 
                                         interactionUpdater
-                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + mc_username + "`)")
+                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + username.getUsername() + "`)")
                                                 .update();
                                     } catch (Exception err) {
                                         interactionUpdater

@@ -13,11 +13,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.loganshaw.mcdlink.util.managers.DatabaseManager;
 import org.loganshaw.mcdlink.util.managers.DiscordManager;
 import org.loganshaw.mcdlink.util.managers.MinecraftManager;
+import org.loganshaw.mcdlink.util.managers.ScheduleManager;
 
 public class MCDLink extends JavaPlugin implements Listener {
 
     public DiscordManager discordManager;
     public MinecraftManager minecraftManager;
+    public ScheduleManager scheduleManager;
     public DatabaseManager databaseManager;
     public MCDLink plugin;
     public Logger logger;
@@ -41,6 +43,7 @@ public class MCDLink extends JavaPlugin implements Listener {
         };
 
         minecraftManager = new MinecraftManager(plugin);
+        scheduleManager = new ScheduleManager(plugin);
 
         try {
             databaseManager = new DatabaseManager(plugin);

@@ -13,29 +13,26 @@ import org.bukkit.scheduler.BukkitTask;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.commands.minecraft.LinkCommand;
 import org.loganshaw.mcdlink.commands.minecraft.UnlinkCommand;
+import org.loganshaw.mcdlink.util.MinecraftUsername;
 import org.loganshaw.mcdlink.util.TempPlayerLink;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.*;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class MinecraftManager {
-    public Map<Long, TempPlayerLink> tempPlayerLinks = new HashMap<>();
+    public final PlayerLinkManager playerLinkManager;
     MCDLink plugin;
     Server server;
     Logger logger;
     ConsoleCommandSender console;
-    File file;
-    YamlConfiguration links;
 
     public MinecraftManager (MCDLink plugin) {
         this.plugin = plugin;
         this.server = plugin.getServer();
         this.logger = plugin.logger;
         this.console = plugin.console;
+        this.playerLinkManager = new PlayerLinkManager(plugin);
 
         plugin.getCommand("mcd-link").setExecutor(new LinkCommand(plugin));
         plugin.getCommand("mcd-unlink").setExecutor(new UnlinkCommand(plugin));
@@ -43,18 +40,14 @@ public class MinecraftManager {
 
     public void onPlayerJoin (PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        String playerName = player.getName();
+        String username = player.getName();
 
-        boolean isTempPlayer = tempPlayerLinks.entrySet().stream().anyMatch(
-            tpl ->
-            (Objects.equals(tpl.getValue().java_username, playerName))
-            || Objects.equals(tpl.getValue().bedrock_username, playerName)
-        );
+        boolean isTempPlayer = this.playerLinkManager.getTempLinkByUsername(new MinecraftUsername(username)) != null;
 
         // Change to include current link code and Discord account name
         if (isTempPlayer) {
             player.setGameMode(GameMode.ADVENTURE);
-            player.sendMessage(Component.text("Hi, §e" + playerName + "§r. You will be §cun-whitelisted§r shortly if you do not run §b/mcd-link"));
+            player.sendMessage(Component.text("Hi, §e" + username + "§r. You will be §cun-whitelisted§r shortly if you do not run §b/mcd-link"));
         }
     }
 
@@ -62,70 +55,55 @@ public class MinecraftManager {
 
     }
 
-    public String addTempPlayerLink (long discord_id, String mc_username) throws Exception {
-        boolean playerExists = setPlayerWhitelist(mc_username, true);
-        if (!playerExists) throw new Exception("Player '" + mc_username + "' doesn't exist");
+    public String addTempPlayerLink (long discord_id, MinecraftUsername username) throws Exception {
+        switch (username.getType()) {
+            case JAVA -> {
+                setPlayerWhitelist(username, true);
+                // if (!playerExists) throw new Exception("Player '" + username.getUsername() + "' doesn't exist");
 
-        // Create temporary player link
-        TempPlayerLink tpl = new TempPlayerLink(discord_id, mc_username);
-        tempPlayerLinks.put(discord_id, tpl);
+                // Create temporary player link & Remove player link after 5 minutes
+                TempPlayerLink tpl = this.playerLinkManager.createTempLink(discord_id, username, (link) -> {
+                    // Change to check if user was verified
+                    setPlayerWhitelist(username, false);
+                    Player player = Bukkit.getPlayer(username.getUsername());
+                    if (player != null) player.kick();
 
-        // Remove player link after 5 minutes
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            new java.util.Timer().schedule( new java.util.TimerTask() {
-                    @Override
-                    public void run() {
-                        // Change to check if user was verified
-                        removeTempPlayerLink(discord_id);
-                        Player player = Bukkit.getPlayer(mc_username);
-                        if (player != null) player.kick();
+                    logger.info("Un-whitelisted '" + player.getName() + "' with Discord ID: " + link.discord_id);
+                });
 
-                        logger.info("Un-whitelisted '" + player.getName() + "' with Discord ID: " + tpl.discord_id);
-                    }
-                },
-                300000
-            );
-        });
+                logger.info("Temporarily whitelisted '" + username.getUsername() + "' with Discord ID: " + tpl.discord_id);
 
-        logger.info("Temporarily whitelisted '" + mc_username + "' with Discord ID: " + tpl.discord_id);
+                return tpl.id;
+            }
 
-        return tpl.id;
-    }
-
-    public void removeTempPlayerLink (long discord_id) {
-        TempPlayerLink tpl = tempPlayerLinks.get(discord_id);
-        String username = tpl.java_username != null ? tpl.java_username : tpl.bedrock_username;
-
-        setPlayerWhitelist(username, false);
-        tempPlayerLinks.remove(tpl.discord_id);
-    }
-
-    public boolean setPlayerWhitelist (String mc_username, boolean add) {
-        String whitelist_type = mc_username.startsWith(".") ? "bedrock" : "java";
-        String username = mc_username.startsWith(".") ? mc_username.replaceFirst(".", "") : mc_username;
-
-        OfflinePlayer player = this.getOfflinePlayer(username);
-
-        if (player != null) {
-            BukkitTask task = Bukkit.getScheduler().runTask(plugin, () -> {
-                switch (whitelist_type) {
-                    case "java" -> {
-                        player.setWhitelisted(add);
-                        Player onlinePlayer = Bukkit.getPlayer(username);
-                        if (onlinePlayer != null) onlinePlayer.kick();
-                    }
-                    case "bedrock" -> logger.info("Got to bedrock whitelist with " + username);
-                }
-            });
-
-            return true;
-        } else return false;
-    }
-
-    public OfflinePlayer getOfflinePlayer(String name) {
-        for(OfflinePlayer player : Bukkit.getOfflinePlayers()) {
-            if(player.getName().equals(name)) return player;
+            case BEDROCK -> {
+                logger.info("Got to bedrock temporary player link with " + username.getUsername());
+                return "something";
+            }
         }
-        return null;
+
+        return "something";
+    }
+
+    public void removeTempPlayerLink (String id) {
+        TempPlayerLink link = this.playerLinkManager.getTempLinkByID(id);
+        this.playerLinkManager.removeTempLink(link);
+    }
+
+    public void setPlayerWhitelist (MinecraftUsername username, boolean add) {
+        switch (username.getType()) {
+            case JAVA -> {
+                String mc_username = username.getUsername();
+                OfflinePlayer player = Bukkit.getOfflinePlayer(mc_username);
+
+                BukkitTask task = Bukkit.getScheduler().runTask(plugin, () -> {
+                    player.setWhitelisted(add);
+                    Player onlinePlayer = Bukkit.getPlayer(mc_username);
+                    if (onlinePlayer != null) onlinePlayer.kick();
+                });
+            }
+
+            case BEDROCK -> logger.info("Got to bedrock whitelist with " + username.getUsername());
+        }
     }
 }

@@ -8,16 +8,13 @@ import java.util.UUID;
 
 public class TempPlayerLink {
     public long discord_id;
-    public String java_username;
-    public String bedrock_username;
+    public MinecraftUsername mc_username;
     public String id = getAlphaNumericString(8);
     public Date created = new Date();
 
-    public TempPlayerLink (long discord_id, String mc_username) throws NullPointerException {
+    public TempPlayerLink (long discord_id, MinecraftUsername mc_username) throws NullPointerException {
         this.discord_id = discord_id;
-
-        if (mc_username.startsWith(".")) bedrock_username = mc_username.replaceFirst(".", "");
-        else java_username = mc_username;
+        this.mc_username = mc_username;
     }
 
     static String getAlphaNumericString(int n)
