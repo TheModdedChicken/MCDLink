@@ -4,25 +4,32 @@ import java.sql.SQLException;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.geysermc.floodgate.api.FloodgateApi;
+import org.geysermc.geyser.api.GeyserApi;
 import org.loganshaw.mcdlink.util.managers.DatabaseManager;
 import org.loganshaw.mcdlink.util.managers.DiscordManager;
 import org.loganshaw.mcdlink.util.managers.MinecraftManager;
 import org.loganshaw.mcdlink.util.managers.ScheduleManager;
 
 public class MCDLink extends JavaPlugin implements Listener {
-
+    public MCDLink plugin;
+    public FloodgateApi floodgate;
+    public GeyserApi geyser;
     public DiscordManager discordManager;
     public MinecraftManager minecraftManager;
     public ScheduleManager scheduleManager;
     public DatabaseManager databaseManager;
-    public MCDLink plugin;
     public Logger logger;
+    public Server server;
+    public BukkitScheduler scheduler;
     public ConsoleCommandSender console;
     public FileConfiguration config;
 
@@ -30,10 +37,14 @@ public class MCDLink extends JavaPlugin implements Listener {
     public void onEnable() {
         saveResource("config.yml", false);
 
-        plugin = this;
-        config = getConfig();
-        logger = getLogger();
-        console = Bukkit.getServer().getConsoleSender();
+        this.plugin = this;
+        this.geyser = GeyserApi.api();
+        this.floodgate = FloodgateApi.getInstance();
+        this.config = getConfig();
+        this.logger = getLogger();
+        this.server = getServer();
+        this.scheduler = this.server.getScheduler();
+        this.console = this.server.getConsoleSender();
 
         try {
             discordManager = new DiscordManager(plugin);

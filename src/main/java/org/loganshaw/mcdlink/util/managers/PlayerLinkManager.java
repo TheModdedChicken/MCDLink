@@ -1,8 +1,8 @@
 package org.loganshaw.mcdlink.util.managers;
 
 import org.loganshaw.mcdlink.MCDLink;
-import org.loganshaw.mcdlink.util.MinecraftUsername;
-import org.loganshaw.mcdlink.util.MinecraftUsernameType;
+import org.loganshaw.mcdlink.util.PUID;
+import org.loganshaw.mcdlink.util.enums.PlatformType;
 import org.loganshaw.mcdlink.util.TempPlayerLink;
 import org.loganshaw.mcdlink.util.errors.TooManySimilarPlayerLinks;
 import org.loganshaw.mcdlink.util.interfaces.ITempPlayerLinkCallback;
@@ -14,7 +14,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 public class PlayerLinkManager {
-    private final List<TempPlayerLink> tempPlayerLinks = new ArrayList<>();
+    private List<TempPlayerLink> tempPlayerLinks = new ArrayList<>();
 
     private final MCDLink plugin;
 
@@ -25,17 +25,17 @@ public class PlayerLinkManager {
     /**
      * Adds a unique temporary player link to memory
      * @param discordID Temporary player link
-     * @param username Minecraft username
+     * @param puid PUID of user
      * @throws TooManySimilarPlayerLinks One or more temporary player links with identical identifiers
      */
-    public TempPlayerLink createTempLink (long discordID, MinecraftUsername username, ITempPlayerLinkCallback timeout) throws TooManySimilarPlayerLinks {
-        TempPlayerLink link = new TempPlayerLink(discordID, username);
+    public TempPlayerLink createTempLink (long discordID, PUID puid, ITempPlayerLinkCallback timeout) throws TooManySimilarPlayerLinks {
+        TempPlayerLink link = new TempPlayerLink(discordID, puid);
 
         Stream<TempPlayerLink> links = getTempLinks( l -> (
                 l.discord_id == link.discord_id
                 || (
-                    Objects.equals(l.mc_username.getUsername(), link.mc_username.getUsername())
-                    && l.mc_username.getType() == link.mc_username.getType()
+                    Objects.equals(l.puid.uuid, link.puid.uuid)
+                    && l.puid.platform == link.puid.platform
                 )
                 || Objects.equals(l.id, link.id)
         ));
@@ -44,17 +44,24 @@ public class PlayerLinkManager {
 
         tempPlayerLinks.add(link);
 
-        this.plugin.scheduleManager.Timeout(20000, () -> {
-            if (this.getTempLinkByID(link.id) != null) timeout.Callback(link);
-            removeTempLink(link);
+        this.plugin.scheduleManager.Timeout(300000, () -> {
+            TempPlayerLink tLink = this.getTempLinkByID(link.id);
+            if (tLink != null) {
+                try {
+                    timeout.Callback(tLink);
+                } catch (RuntimeException ignored) {}
+
+                removeTempLink(tLink.id);
+            }
         });
 
         return link;
     }
 
-    public boolean removeTempLink (TempPlayerLink link) {
-        // TO-DO: Fix
-        return tempPlayerLinks.remove(link);
+    public void removeTempLink (String id) {
+        List<TempPlayerLink> newLinks = tempPlayerLinks.stream().filter(l -> !Objects.equals(l.id, id)).toList();
+        tempPlayerLinks.clear();
+        tempPlayerLinks.addAll(newLinks);
     }
 
     /**
@@ -72,20 +79,20 @@ public class PlayerLinkManager {
 
     /**
      * Gets a temporary player link using a Minecraft username
-     * @param username Minecraft username
+     * @param puid PUID of user
      * @return A temporary player link. Returns null if no link is found.
      */
-    public TempPlayerLink getTempLinkByUsername (MinecraftUsername username) {
+    public TempPlayerLink getTempLinkByUsername (PUID puid) {
         try {
             return this.getUniqueTempLink(l ->
-                    Objects.equals(l.mc_username.getUsername(), username.getUsername())
-                    && l.mc_username.getType() == username.getType()
+                    Objects.equals(l.puid.uuid, puid.uuid)
+                    && l.puid.platform == puid.platform
             );
         } catch (TooManySimilarPlayerLinks e) {
             throw new RuntimeException(
                     "Found more than one temporary player link with the "
-                    + (username.getType() == MinecraftUsernameType.JAVA ? "Java" : "Bedrock")
-                    + " username '" + username.getUsername() + "'."
+                    + (puid.platform == PlatformType.JAVA ? "Java" : "Bedrock")
+                    + " username '" + this.plugin.minecraftManager.getUsernameFromPUID(puid) + "'."
             );
         }
     }

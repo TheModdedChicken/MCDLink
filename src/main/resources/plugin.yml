@@ -7,12 +7,20 @@ website: https://loganshaw.org
 api-version: '1.20'
 softdepend:
   - floodgate
+permissions:
+  mcdlink.link:
+    description: "Allows a user to link their Discord account"
+    default: true
+  mcdlink.unlink:
+    description: "Allows a user to unlink their Discord account"
+    default: true
+
 commands:
   mcd-link:
-    description: Link your Discord account
-    usage: /<command> <code>
+    description: "Link your Discord account"
+    usage: "/mcd-link <code>"
     permission: mcdlink.link
   mcd-unlink:
-    description: Unlink your Discord account
-    usage: /<command>
+    description: "Unlink your Discord account"
+    usage: "/mcd-unlink"
     permission: mcdlink.unlink

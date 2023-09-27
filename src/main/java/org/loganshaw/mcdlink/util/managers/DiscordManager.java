@@ -8,8 +8,8 @@ import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.interaction.*;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.util.DiscordCommand;
-import org.loganshaw.mcdlink.util.MinecraftUsername;
-import org.loganshaw.mcdlink.util.MinecraftUsernameType;
+import org.loganshaw.mcdlink.util.PUID;
+import org.loganshaw.mcdlink.util.enums.PlatformType;
 import org.loganshaw.mcdlink.util.TempPlayerLink;
 
 import java.util.*;
@@ -46,7 +46,7 @@ public class DiscordManager {
             // Listen for, and execute, Discord command calls
             api.addSlashCommandCreateListener(event -> {
                 SlashCommandInteraction slashCommandInteraction = event.getSlashCommandInteraction();
-                commands.get(slashCommandInteraction.getCommandName()).operation.Operation(event);
+                commands.get(slashCommandInteraction.getCommandName()).operation.Operation(event, this.plugin);
             });
 
         }
@@ -109,7 +109,7 @@ public class DiscordManager {
     Map<String, DiscordCommand> commands = new HashMap<>() {{
         put("ping", new DiscordCommand(
                 "Check bot status",
-                event ->
+                (event, plugin) ->
                         event.getInteraction().createImmediateResponder()
                                 .setContent("Pong!")
                                 .setFlags(MessageFlag.EPHEMERAL)
@@ -130,23 +130,27 @@ public class DiscordManager {
                                 )
                         )
                 ),
-                event -> {
+                (event, plugin) -> {
                     SlashCommandInteraction interaction = event.getSlashCommandInteraction();
                     String subCommand = interaction.getFullCommandName().split(" ", 0)[1];
 
                     long user_id = interaction.getUser().getId();
-                    MinecraftUsername username = new MinecraftUsername(
-                            (Objects.equals(subCommand, "bedrock") ? "." : "")
-                            + interaction.getArgumentStringValueByName("username").orElse("")
-                    );
+                    PlatformType platformType = Objects.equals(subCommand, "java") ? PlatformType.JAVA : PlatformType.BEDROCK;
+                    String username = interaction.getArgumentStringValueByName("username").orElse("");
+                    UUID uuid = platformType == PlatformType.JAVA
+                            ? plugin.server.getOfflinePlayer(username).getUniqueId()
+                            : plugin.floodgate.getUuidFor(username).join();
+
+                    PUID puid = new PUID(uuid, platformType);
 
                     // Check if user is already trying to link an account
                     TempPlayerLink tpl = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
+
                     if (tpl != null) {
-                        String platform = tpl.mc_username.getType() == MinecraftUsernameType.JAVA ? "Java" : "Bedrock";
+                        String platform = puid.platform == PlatformType.JAVA ? "Java" : "Bedrock";
 
                         interaction.createImmediateResponder()
-                                .setContent("You're already trying to link `" + tpl.mc_username.getUsername() + "` on " + platform + ".")
+                                .setContent("You're already trying to link `" + username + "` on " + platform + ".")
                                 .setFlags(MessageFlag.EPHEMERAL)
                                 .respond();
                     }
@@ -154,12 +158,15 @@ public class DiscordManager {
                         interaction.respondLater(true)
                                 .thenAccept(interactionUpdater -> {
                                     try {
-                                        String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, username);
+                                        String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, puid);
 
                                         interactionUpdater
-                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + username.getUsername() + "`)")
+                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + username + "`)")
                                                 .update();
                                     } catch (Exception err) {
+                                        logger.info(err.toString());
+                                        logger.info(Arrays.toString(err.getStackTrace()));
+
                                         interactionUpdater
                                                 .setContent(err.getMessage())
                                                 .update();

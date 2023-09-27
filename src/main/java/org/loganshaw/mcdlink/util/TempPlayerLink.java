@@ -1,20 +1,16 @@
 package org.loganshaw.mcdlink.util;
 
-import org.bukkit.Bukkit;
-
 import java.util.Date;
-import java.util.Objects;
-import java.util.UUID;
 
 public class TempPlayerLink {
     public long discord_id;
-    public MinecraftUsername mc_username;
+    public PUID puid;
     public String id = getAlphaNumericString(8);
     public Date created = new Date();
 
-    public TempPlayerLink (long discord_id, MinecraftUsername mc_username) throws NullPointerException {
+    public TempPlayerLink (long discord_id, PUID puid) throws NullPointerException {
         this.discord_id = discord_id;
-        this.mc_username = mc_username;
+        this.puid = puid;
     }
 
     static String getAlphaNumericString(int n)
