@@ -87,7 +87,6 @@ public class MinecraftManager {
 
     public long getXUIDFromPUID (PUID puid) {
         String stringifiedXUID = puid.uuid.toString().split("-", 3)[2].replace("-", "");
-        plugin.logger.info(stringifiedXUID);
         return Long.parseLong(stringifiedXUID, 16);
     }
 
