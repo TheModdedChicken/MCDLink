@@ -1,18 +1,25 @@
 package org.loganshaw.mcdlink.util.managers;
 
+import net.kyori.adventure.text.Component;
+import org.bukkit.GameMode;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.intent.Intent;
 import org.javacord.api.entity.message.MessageFlag;
+import org.javacord.api.entity.message.embed.EmbedBuilder;
+import org.javacord.api.entity.user.User;
 import org.javacord.api.interaction.*;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.util.DiscordCommand;
 import org.loganshaw.mcdlink.util.PUID;
+import org.loganshaw.mcdlink.util.PlayerLink;
 import org.loganshaw.mcdlink.util.enums.PlatformType;
 import org.loganshaw.mcdlink.util.TempPlayerLink;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 import java.util.logging.Logger;
 
 /*
@@ -87,7 +94,13 @@ public class DiscordManager {
                 DiscordCommand data = cmd.getValue();
 
                 if (data.options != null) SlashCommand.with(name, Versionize(data.description), data.options).createGlobal(api).join();
-                else if (data.option != null) SlashCommand.with(name, Versionize(data.description), data.option).createGlobal(api).join();
+                else if (data.option != null) SlashCommand.with(name, Versionize(data.description),
+                        new SlashCommandOptionBuilder()
+                                .setType(data.option.getType())
+                                .setName(data.option.getName())
+                                .setDescription(data.option.getDescription())
+                                .setRequired(data.option.isRequired())
+                ).createGlobal(api).join();
                 else SlashCommand.with(name, Versionize(data.description)).createGlobal(api).join();
 
                 logger.info("Registered Discord command '" + name + "'.");
@@ -142,17 +155,33 @@ public class DiscordManager {
                             : plugin.floodgate.getUuidFor(username).join();
 
                     PUID puid = new PUID(uuid, platformType);
+                    String platform = puid.platform == PlatformType.JAVA ? "Java" : "Bedrock";
 
                     // Check if user is already trying to link an account
-                    TempPlayerLink tpl = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
+                    TempPlayerLink discordIDTempCheck = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
+                    PlayerLink puidCheck = plugin.databaseManager.getPlayerLinkFromPUID(puid);
 
-                    if (tpl != null) {
-                        String platform = puid.platform == PlatformType.JAVA ? "Java" : "Bedrock";
-
+                    if (discordIDTempCheck != null) {
                         interaction.createImmediateResponder()
                                 .setContent("You're already trying to link `" + username + "` on " + platform + ".")
                                 .setFlags(MessageFlag.EPHEMERAL)
                                 .respond();
+                    }
+                    else if (puidCheck != null) {
+                        if (puidCheck.discordID == user_id) {
+                            interaction.createImmediateResponder()
+                                    .setContent(
+                                            "You already have `" + username + "` linked on " + platform + "."
+                                            + "\nPlease use `/unlink` before trying to link a new account."
+                                    )
+                                    .setFlags(MessageFlag.EPHEMERAL)
+                                    .respond();
+                        } else {
+                            interaction.createImmediateResponder()
+                                    .setContent("You're already trying to link `" + username + "` on " + platform + ".")
+                                    .setFlags(MessageFlag.EPHEMERAL)
+                                    .respond();
+                        }
                     }
                     else {
                         interaction.respondLater(true)
@@ -161,7 +190,7 @@ public class DiscordManager {
                                         String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, puid);
 
                                         interactionUpdater
-                                                .setContent("Please run `/mcd-link " + link_id + "` on your Java account (`" + username + "`)")
+                                                .setContent("Please run `/mcd-link " + link_id + "` on your " + platform + " account (`" + username + "`)")
                                                 .update();
                                     } catch (Exception err) {
                                         logger.info(err.toString());
@@ -174,6 +203,105 @@ public class DiscordManager {
                                 });
 
                     }
+                }
+        ));
+
+        put("unlink", new DiscordCommand(
+                "Unlink Minecraft account",
+                Arrays.asList(
+                        SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "java", "Unlinks a Java account"),
+                        SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "bedrock", "Unlinks a Bedrock/Xbox account")
+                ),
+                (event, plugin) -> {
+                    SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+                    String subCommand = interaction.getFullCommandName().split(" ", 0)[1];
+
+                    long user_id = interaction.getUser().getId();
+                    PlatformType platformType = Objects.equals(subCommand, "java") ? PlatformType.JAVA : PlatformType.BEDROCK;
+                    String platform = platformType == PlatformType.JAVA ? "Java" : "Bedrock";
+
+                    PlayerLink playerLink = plugin.databaseManager.getPlayerLinkFromDiscordID(user_id);
+
+                    if (playerLink == null) {
+                        interaction.createImmediateResponder()
+                                .setContent("You don't have any accounts linked.")
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
+                    }
+                    else if (
+                            (playerLink.javaUUID != null && platformType == PlatformType.JAVA)
+                            || (playerLink.bedrockUUID != null && platformType == PlatformType.BEDROCK)
+                    ) {
+                        try {
+                            // Retain current links
+                            UUID javaUUID = platformType != PlatformType.JAVA
+                                    ? playerLink.javaUUID
+                                    : null;
+                            UUID bedrockUUID = platformType != PlatformType.BEDROCK
+                                    ? playerLink.bedrockUUID
+                                    : null;
+
+                            plugin.databaseManager.setLink(new PlayerLink(playerLink.discordID, javaUUID, bedrockUUID));
+
+                            UUID uuid = platformType == PlatformType.JAVA ? playerLink.javaUUID : playerLink.bedrockUUID;
+                            plugin.minecraftManager.setPlayerWhitelist(uuid, false);
+                            plugin.minecraftManager.kickPlayer(uuid);
+
+                            interaction.createImmediateResponder()
+                                    .setContent("Unlinked your " + platform + " account.")
+                                    .setFlags(MessageFlag.EPHEMERAL)
+                                    .respond();
+                        } catch (RuntimeException err) {
+                            interaction.createImmediateResponder()
+                                    .setContent("Something went wrong while trying to unlink your " + platform + " account :/")
+                                    .setFlags(MessageFlag.EPHEMERAL)
+                                    .respond();
+                        }
+                    } else {
+                        interaction.createImmediateResponder()
+                                .setContent("You don't have any accounts linked on " + platform + ".")
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
+                    }
+                }
+        ));
+
+        put("whois", new DiscordCommand(
+                "Check a user's linked Minecraft accounts",
+                SlashCommandOption.create(SlashCommandOptionType.USER, "user", "User to check", true),
+                (event, plugin) -> {
+                    SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+                    User user = interaction.getArgumentUserValueByName("user").orElse(null);
+                    if (user == null) interaction.createImmediateResponder()
+                            .setContent("Couldn't find specified user.")
+                            .setFlags(MessageFlag.EPHEMERAL)
+                            .respond();
+
+                    long userID = user.getId();
+
+                    PlayerLink playerLink = plugin.databaseManager.getPlayerLinkFromDiscordID(userID);
+                    if (playerLink == null) interaction.createImmediateResponder()
+                            .setContent("<@" + userID + "> doesn't have any linked accounts.")
+                            .setFlags(MessageFlag.EPHEMERAL)
+                            .respond();
+
+                    String javaUsername = playerLink.javaUUID != null
+                            ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.javaUUID, PlatformType.JAVA))
+                            : "None";
+                    String bedrockUsername = playerLink.bedrockUUID != null
+                            ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.bedrockUUID, PlatformType.BEDROCK))
+                            : "None";
+
+                    interaction.createImmediateResponder()
+                            .addEmbed(new EmbedBuilder()
+                                    .setTitle(user.getName())
+                                    .addField("Java", javaUsername)
+                                    .addField("Bedrock", bedrockUsername)
+                                    .setFooter("ID: " + userID)
+                                    .setColor(Color.decode("#5da4ff"))
+                            )
+                            .setFlags(MessageFlag.EPHEMERAL)
+                            .respond();
                 }
         ));
     }};

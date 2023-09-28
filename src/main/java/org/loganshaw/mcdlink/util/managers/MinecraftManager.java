@@ -82,7 +82,13 @@ public class MinecraftManager {
     public String getUsernameFromPUID (PUID puid) {
         return puid.platform == PlatformType.JAVA
                 ? plugin.server.getOfflinePlayer(puid.uuid).getName()
-                : puid.uuid.toString();
+                : plugin.floodgate.getGamertagFor(getXUIDFromPUID(puid)).join();
+    }
+
+    public long getXUIDFromPUID (PUID puid) {
+        String stringifiedXUID = puid.uuid.toString().split("-", 3)[2].replace("-", "");
+        plugin.logger.info(stringifiedXUID);
+        return Long.parseLong(stringifiedXUID, 16);
     }
 
     public void setPlayerWhitelist (UUID uuid, boolean add) {

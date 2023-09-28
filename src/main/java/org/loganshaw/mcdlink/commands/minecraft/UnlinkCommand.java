@@ -1,5 +1,6 @@
 package org.loganshaw.mcdlink.commands.minecraft;
 
+import com.avaje.ebean.validation.NotNull;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -44,6 +45,7 @@ public class UnlinkCommand implements CommandExecutor {
             return false;
         }
 
+        // Retain current links
         UUID javaUUID = puid.platform != PlatformType.JAVA
                 ? playerLink.javaUUID
                 : null;

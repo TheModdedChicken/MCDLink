@@ -33,21 +33,11 @@ public class LinkCommand implements CommandExecutor {
         Player player = Bukkit.getPlayer(commandSender.getName());
         if (player == null) {
             commandSender.sendMessage(Component.text("§cSomething went wrong while trying to unlink your account :/"));
-            return false;
-        }
-
-        TempPlayerLink tempLink = this.plugin.minecraftManager.playerLinkManager.getTempLinkByID(args[0]);
-        if (tempLink == null) {
-            this.plugin.logger.info("Temp");
-            commandSender.sendMessage(Component.text("§cInvalid link code"));
             return true;
         }
 
-        String linkUsername = this.plugin.minecraftManager.getUsernameFromPUID(tempLink.puid);
-        FloodgatePlayer floodgatePlayer = this.plugin.floodgate.getPlayer(player.getUniqueId());
-        String username = floodgatePlayer != null ? floodgatePlayer.getUsername() : commandSender.getName();
-
-        if (!Objects.equals(linkUsername, username) && !Objects.equals(linkUsername, player.getUniqueId().toString()) ) {
+        TempPlayerLink tempLink = this.plugin.minecraftManager.playerLinkManager.getTempLinkByID(args[0]);
+        if (tempLink == null || !Objects.equals(tempLink.puid.uuid, player.getUniqueId())) {
             commandSender.sendMessage(Component.text("§cInvalid link code"));
             return true;
         }
@@ -58,6 +48,7 @@ public class LinkCommand implements CommandExecutor {
         try {
             PlayerLink playerLink = this.plugin.databaseManager.getPlayerLinkFromDiscordID(discordID);
 
+            // Retain current links
             UUID javaUUID = playerLink != null && tempLink.puid.platform != PlatformType.JAVA
                     ? playerLink.javaUUID
                     : tempLink.puid.platform == PlatformType.JAVA

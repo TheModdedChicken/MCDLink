@@ -10,7 +10,7 @@ import java.util.List;
 
 public class DiscordCommand {
     public IDiscordCommandOperation operation;
-    public SlashCommandOptionBuilder option;
+    public SlashCommandOption option;
     public List<SlashCommandOption> options;
     public String description;
 
@@ -30,7 +30,7 @@ public class DiscordCommand {
      * @param option Command option
      * @param operation Function to execute when called
      */
-    public DiscordCommand (String description, SlashCommandOptionBuilder option, IDiscordCommandOperation operation) {
+    public DiscordCommand (String description, SlashCommandOption option, IDiscordCommandOperation operation) {
         this.description = description;
         this.operation = operation;
         this.option = option;

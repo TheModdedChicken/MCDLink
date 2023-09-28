@@ -49,8 +49,7 @@ public class MCDLink extends JavaPlugin implements Listener {
         try {
             discordManager = new DiscordManager(plugin);
         } catch (Exception err) {
-            logger.severe(err.getMessage());
-            return;
+            throw new RuntimeException(err);
         };
 
         minecraftManager = new MinecraftManager(plugin);
