@@ -308,28 +308,31 @@ public class DiscordManager {
                     long userID = user.getId();
 
                     PlayerLink playerLink = plugin.databaseManager.getPlayerLinkFromDiscordID(userID);
-                    if (playerLink == null) interaction.createImmediateResponder()
-                            .setContent("<@" + userID + "> doesn't have any linked accounts.")
-                            .setFlags(MessageFlag.EPHEMERAL)
-                            .respond();
+                    if (playerLink == null) {
+                        interaction.createImmediateResponder()
+                                .setContent("<@" + userID + "> doesn't have any linked accounts.")
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
+                    }
+                    else {
+                        String javaUsername = playerLink.javaUUID != null
+                                ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.javaUUID, PlatformType.JAVA))
+                                : "None";
+                        String bedrockUsername = playerLink.bedrockUUID != null
+                                ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.bedrockUUID, PlatformType.BEDROCK))
+                                : "None";
 
-                    String javaUsername = playerLink.javaUUID != null
-                            ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.javaUUID, PlatformType.JAVA))
-                            : "None";
-                    String bedrockUsername = playerLink.bedrockUUID != null
-                            ? plugin.minecraftManager.getUsernameFromPUID(new PUID(playerLink.bedrockUUID, PlatformType.BEDROCK))
-                            : "None";
-
-                    interaction.createImmediateResponder()
-                            .addEmbed(new EmbedBuilder()
-                                    .setTitle(user.getName())
-                                    .addField("Java", javaUsername)
-                                    .addField("Bedrock", bedrockUsername)
-                                    .setFooter("ID: " + userID)
-                                    .setColor(Color.decode("#5da4ff"))
-                            )
-                            .setFlags(MessageFlag.EPHEMERAL)
-                            .respond();
+                        interaction.createImmediateResponder()
+                                .addEmbed(new EmbedBuilder()
+                                        .setTitle(user.getName())
+                                        .addField("Java", javaUsername)
+                                        .addField("Bedrock", bedrockUsername)
+                                        .setFooter("ID: " + userID)
+                                        .setColor(Color.decode("#5da4ff"))
+                                )
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
+                    }
                 }
         ));
     }};
