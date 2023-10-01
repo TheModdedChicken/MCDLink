@@ -44,7 +44,9 @@ public class PlayerLinkManager {
 
         tempPlayerLinks.add(link);
 
-        this.plugin.scheduleManager.Timeout(300000, () -> {
+        long delay = plugin.config.getLong("link_time");
+
+        this.plugin.scheduleManager.Timeout(delay > 0 ? delay : 300000, () -> {
             TempPlayerLink tLink = this.getTempLinkByID(link.id);
             if (tLink != null) {
                 try {
@@ -82,7 +84,7 @@ public class PlayerLinkManager {
      * @param puid PUID of user
      * @return A temporary player link. Returns null if no link is found.
      */
-    public TempPlayerLink getTempLinkByUsername (PUID puid) {
+    public TempPlayerLink getTempLinkByPUID(PUID puid) {
         try {
             return this.getUniqueTempLink(l ->
                     Objects.equals(l.puid.uuid, puid.uuid)

@@ -1,6 +1,5 @@
 # MCD Link Config
 # bot_token: <token>
-# guild_id: <guild_id>
 
 # Amount of time in milliseconds a player is temporarily whitelisted, so they can link their account.
 # Example: 300000 (5 minutes)

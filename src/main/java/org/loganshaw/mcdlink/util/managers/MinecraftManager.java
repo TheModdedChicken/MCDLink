@@ -9,6 +9,7 @@ import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.scheduler.BukkitTask;
+import org.javacord.api.entity.user.User;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.commands.minecraft.LinkCommand;
 import org.loganshaw.mcdlink.commands.minecraft.UnlinkCommand;
@@ -42,11 +43,17 @@ public class MinecraftManager {
         UUID uuid = player.getUniqueId();
         PlatformType platform = this.plugin.floodgate.isFloodgateId(uuid) ? PlatformType.BEDROCK : PlatformType.JAVA;
 
-        boolean isTempPlayer = this.playerLinkManager.getTempLinkByUsername(new PUID(uuid, platform)) != null;
+        TempPlayerLink tempPlayerLink = this.playerLinkManager.getTempLinkByPUID(new PUID(uuid, platform));
+        boolean isTempPlayer = tempPlayerLink != null;
 
         if (isTempPlayer) {
+            User discordUser = this.plugin.discordManager.api.getUserById(tempPlayerLink.discord_id).join();
+            String discordName = discordUser.getName();
+
             player.setGameMode(GameMode.ADVENTURE);
-            player.sendMessage(Component.text("Please run §b/mcd-link§r with the code provided on Discord or you'll be §ckicked§r in §e5 minutes§r."));
+            player.sendMessage(Component.text(
+                    "Please run §b/mcd-link " + tempPlayerLink.id + "§r to link your Discord account (" + discordName + "), or you'll be §ckicked§r in §e5 minutes§r."
+            ));
         }
     }
 
@@ -69,7 +76,7 @@ public class MinecraftManager {
             logger.info("Un-whitelisted '" + username + "' (" + puid.uuid + ") with Discord ID '" + link.discord_id + "'.");
         });
 
-        logger.info("Temporarily whitelisted '" + username + "' (" + puid.uuid + ") with Discord ID '" + tpl.discord_id + "'.");
+        logger.info("Temporarily whitelisted '" + username + "' (" + puid.uuid + ") with Discord ID '" + tpl.discord_id + "'. (" + tpl.id + ")");
 
         return tpl.id;
     }

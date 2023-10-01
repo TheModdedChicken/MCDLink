@@ -149,59 +149,77 @@ public class DiscordManager {
 
                     long user_id = interaction.getUser().getId();
                     PlatformType platformType = Objects.equals(subCommand, "java") ? PlatformType.JAVA : PlatformType.BEDROCK;
+                    String platform = platformType == PlatformType.JAVA ? "Java" : "Bedrock";
                     String username = interaction.getArgumentStringValueByName("username").orElse("");
-                    UUID uuid = platformType == PlatformType.JAVA
-                            ? plugin.server.getOfflinePlayer(username).getUniqueId()
-                            : plugin.floodgate.getUuidFor(username).join();
 
-                    PUID puid = new PUID(uuid, platformType);
-                    String platform = puid.platform == PlatformType.JAVA ? "Java" : "Bedrock";
+                    try {
+                        UUID uuid = platformType == PlatformType.JAVA
+                                ? plugin.server.getOfflinePlayer(username).getUniqueId()
+                                : plugin.floodgate.getUuidFor(username).join();
+                        PUID puid = new PUID(uuid, platformType);
 
-                    // Check if user is already trying to link an account
-                    TempPlayerLink discordIDTempCheck = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
-                    PlayerLink puidCheck = plugin.databaseManager.getPlayerLinkFromPUID(puid);
+                        // Check if user is already trying to link an account
+                        TempPlayerLink discordIDTempCheck = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
+                        PlayerLink puidCheck = plugin.databaseManager.getPlayerLinkFromPUID(puid);
 
-                    if (discordIDTempCheck != null) {
-                        interaction.createImmediateResponder()
-                                .setContent("You're already trying to link `" + username + "` on " + platform + ".")
-                                .setFlags(MessageFlag.EPHEMERAL)
-                                .respond();
-                    }
-                    else if (puidCheck != null) {
-                        if (puidCheck.discordID == user_id) {
+                        if (discordIDTempCheck != null) {
                             interaction.createImmediateResponder()
                                     .setContent(
-                                            "You already have `" + username + "` linked on " + platform + "."
-                                            + "\nPlease use `/unlink` before trying to link a new account."
+                                            "You're already trying to link `" + username + "` on " + platform + ".\n"
+                                            + "Please run `/mcd-link " + discordIDTempCheck.id + "` on the Minecraft server, or run `/unlink` here to stop linking your account."
                                     )
                                     .setFlags(MessageFlag.EPHEMERAL)
                                     .respond();
-                        } else {
-                            interaction.createImmediateResponder()
-                                    .setContent("You're already trying to link `" + username + "` on " + platform + ".")
-                                    .setFlags(MessageFlag.EPHEMERAL)
-                                    .respond();
                         }
-                    }
-                    else {
-                        interaction.respondLater(true)
-                                .thenAccept(interactionUpdater -> {
-                                    try {
-                                        String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, puid);
+                        else if (puidCheck != null) {
+                            if (puidCheck.discordID == user_id) {
+                                interaction.createImmediateResponder()
+                                        .setContent(
+                                                "You already have `" + username + "` linked on " + platform + "."
+                                                + "\nPlease use `/unlink` before trying to link a new account."
+                                        )
+                                        .setFlags(MessageFlag.EPHEMERAL)
+                                        .respond();
+                            } else {
+                                interaction.createImmediateResponder()
+                                        .setContent("You're already trying to link `" + username + "` on " + platform + ".")
+                                        .setFlags(MessageFlag.EPHEMERAL)
+                                        .respond();
+                            }
+                        }
+                        else {
+                            interaction.respondLater(true)
+                                    .thenAccept(interactionUpdater -> {
+                                        try {
+                                            String link_id = plugin.minecraftManager.addTempPlayerLink(user_id, puid);
 
-                                        interactionUpdater
-                                                .setContent("Please run `/mcd-link " + link_id + "` on your " + platform + " account (`" + username + "`)")
-                                                .update();
-                                    } catch (Exception err) {
-                                        logger.info(err.toString());
-                                        logger.info(Arrays.toString(err.getStackTrace()));
+                                            interactionUpdater
+                                                    .setContent(
+                                                            "You've been temporarily whitelisted on the Minecraft server.\n"
+                                                            + "Join the server on your "
+                                                            + platform + " account (`" + username + "`) "
+                                                            + "and run `/mcd-link " + link_id + "`."
+                                                    )
+                                                    .update();
+                                        } catch (Exception err) {
+                                            logger.info(err.toString());
+                                            logger.info(Arrays.toString(err.getStackTrace()));
 
-                                        interactionUpdater
-                                                .setContent(err.getMessage())
-                                                .update();
-                                    }
-                                });
+                                            interactionUpdater
+                                                    .setContent(err.getMessage())
+                                                    .update();
+                                        }
+                                    });
 
+                        }
+                    } catch (RuntimeException err) {
+                        interaction.createImmediateResponder()
+                                .setContent(
+                                        "Something went wrong while trying to link your " + platform + " account :/\n"
+                                        + "Make sure you spelt your username correctly. It's cAsE-sEnSiTiVe."
+                                )
+                                .setFlags(MessageFlag.EPHEMERAL)
+                                .respond();
                     }
                 }
         ));
@@ -220,30 +238,27 @@ public class DiscordManager {
                     PlatformType platformType = Objects.equals(subCommand, "java") ? PlatformType.JAVA : PlatformType.BEDROCK;
                     String platform = platformType == PlatformType.JAVA ? "Java" : "Bedrock";
 
-                    PlayerLink playerLink = plugin.databaseManager.getPlayerLinkFromDiscordID(user_id);
+                    try {
+                        PlayerLink storedPlayerLink = plugin.databaseManager.getPlayerLinkFromDiscordID(user_id);
+                        TempPlayerLink tempPlayerLink = plugin.minecraftManager.playerLinkManager.getTempLinkByDiscordID(user_id);
 
-                    if (playerLink == null) {
-                        interaction.createImmediateResponder()
-                                .setContent("You don't have any accounts linked.")
-                                .setFlags(MessageFlag.EPHEMERAL)
-                                .respond();
-                    }
-                    else if (
-                            (playerLink.javaUUID != null && platformType == PlatformType.JAVA)
-                            || (playerLink.bedrockUUID != null && platformType == PlatformType.BEDROCK)
-                    ) {
-                        try {
+                        if (
+                            storedPlayerLink != null && (
+                                (storedPlayerLink.javaUUID != null && platformType == PlatformType.JAVA)
+                                || (storedPlayerLink.bedrockUUID != null && platformType == PlatformType.BEDROCK)
+                            )
+                        ) {
                             // Retain current links
                             UUID javaUUID = platformType != PlatformType.JAVA
-                                    ? playerLink.javaUUID
+                                    ? storedPlayerLink.javaUUID
                                     : null;
                             UUID bedrockUUID = platformType != PlatformType.BEDROCK
-                                    ? playerLink.bedrockUUID
+                                    ? storedPlayerLink.bedrockUUID
                                     : null;
 
-                            plugin.databaseManager.setLink(new PlayerLink(playerLink.discordID, javaUUID, bedrockUUID));
+                            plugin.databaseManager.setLink(new PlayerLink(storedPlayerLink.discordID, javaUUID, bedrockUUID));
 
-                            UUID uuid = platformType == PlatformType.JAVA ? playerLink.javaUUID : playerLink.bedrockUUID;
+                            UUID uuid = platformType == PlatformType.JAVA ? storedPlayerLink.javaUUID : storedPlayerLink.bedrockUUID;
                             plugin.minecraftManager.setPlayerWhitelist(uuid, false);
                             plugin.minecraftManager.kickPlayer(uuid);
 
@@ -251,15 +266,24 @@ public class DiscordManager {
                                     .setContent("Unlinked your " + platform + " account.")
                                     .setFlags(MessageFlag.EPHEMERAL)
                                     .respond();
-                        } catch (RuntimeException err) {
+                        }
+                        else if (tempPlayerLink != null) {
+                            plugin.minecraftManager.playerLinkManager.removeTempLink(tempPlayerLink.id);
+
                             interaction.createImmediateResponder()
-                                    .setContent("Something went wrong while trying to unlink your " + platform + " account :/")
+                                    .setContent("Stopped linking your account on " + platform + ".")
                                     .setFlags(MessageFlag.EPHEMERAL)
                                     .respond();
                         }
-                    } else {
+                        else {
+                            interaction.createImmediateResponder()
+                                    .setContent("You don't have any accounts linked on " + platform + ".")
+                                    .setFlags(MessageFlag.EPHEMERAL)
+                                    .respond();
+                        }
+                    } catch (RuntimeException err) {
                         interaction.createImmediateResponder()
-                                .setContent("You don't have any accounts linked on " + platform + ".")
+                                .setContent("Something went wrong while trying to unlink your " + platform + " account :/")
                                 .setFlags(MessageFlag.EPHEMERAL)
                                 .respond();
                     }

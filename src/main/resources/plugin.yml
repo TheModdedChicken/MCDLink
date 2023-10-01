@@ -1,5 +1,5 @@
 name: MCDLink
-version: 0.1.0
+version: 0.1.1
 main: org.loganshaw.mcdlink.MCDLink
 description: A bridge between Discord servers and Minecraft servers
 author: TheModdedChicken
