@@ -8,7 +8,6 @@ import org.bukkit.Server;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.scheduler.BukkitTask;
 import org.javacord.api.entity.user.User;
 import org.loganshaw.mcdlink.MCDLink;
 import org.loganshaw.mcdlink.commands.minecraft.LinkCommand;
@@ -34,8 +33,8 @@ public class MinecraftManager {
         this.console = plugin.console;
         this.playerLinkManager = new PlayerLinkManager(plugin);
 
-        plugin.getCommand("mcd-link").setExecutor(new LinkCommand(plugin));
-        plugin.getCommand("mcd-unlink").setExecutor(new UnlinkCommand(plugin));
+        Objects.requireNonNull(plugin.getCommand("mcd-link")).setExecutor(new LinkCommand(plugin));
+        Objects.requireNonNull(plugin.getCommand("mcd-unlink")).setExecutor(new UnlinkCommand(plugin));
     }
 
     public void onPlayerJoin (PlayerJoinEvent event) {
@@ -60,12 +59,12 @@ public class MinecraftManager {
     public String addTempPlayerLink (long discord_id, PUID puid) throws Exception {
         String username = getUsernameFromPUID(puid);
 
-        setPlayerWhitelist(puid.uuid, true);
+        setPlayerWhitelist(puid, true);
 
         // Create temporary player link & Remove player link after 5 minutes
         TempPlayerLink tpl = this.playerLinkManager.createTempLink(discord_id, puid, (link) -> {
             // Change to check if user was verified
-            setPlayerWhitelist(puid.uuid, false);
+            setPlayerWhitelist(puid, false);
             kickPlayer(puid.uuid);
 
             try {
@@ -97,16 +96,28 @@ public class MinecraftManager {
         return Long.parseLong(stringifiedXUID, 16);
     }
 
-    public void setPlayerWhitelist (UUID uuid, boolean add) {
-        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+    public void setPlayerWhitelist (PUID puid, boolean add) {
+        switch (puid.platform) {
+            case JAVA -> {
+                OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(puid.uuid);
 
-        BukkitTask task = Bukkit.getScheduler().runTask(plugin, () -> {
-            offlinePlayer.setWhitelisted(add);
-        });
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    plugin.logger.info(offlinePlayer.getName());
+                    offlinePlayer.setWhitelisted(add);
+                });
+            }
+
+            case BEDROCK -> Bukkit.getScheduler().runTask(plugin, () ->
+                    plugin.server.dispatchCommand(
+                            plugin.console,
+                            "fwhitelist " + (add ? "add" : "remove") + " " + puid.uuid
+                    )
+            );
+        }
     }
 
     public void kickPlayer (UUID uuid) {
-        BukkitTask task = Bukkit.getScheduler().runTask(plugin, () -> {
+        Bukkit.getScheduler().runTask(plugin, () -> {
             Player onlinePlayer = this.plugin.server.getPlayer(uuid);
             if (onlinePlayer != null) onlinePlayer.kick();
         });

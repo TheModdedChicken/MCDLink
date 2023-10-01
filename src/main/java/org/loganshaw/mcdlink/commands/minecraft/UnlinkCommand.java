@@ -57,7 +57,7 @@ public class UnlinkCommand implements CommandExecutor {
 
         commandSender.sendMessage(Component.text("§cUnlinked account. You'll be kicked in 30 seconds"));
         player.setGameMode(GameMode.ADVENTURE);
-        this.plugin.minecraftManager.setPlayerWhitelist(player.getUniqueId(), false);
+        this.plugin.minecraftManager.setPlayerWhitelist(puid, false);
         this.plugin.scheduleManager.Timeout(30000, () -> {
             PlayerLink timeoutPlayerLink = this.plugin.databaseManager.getPlayerLinkFromPUID(puid);
             if (timeoutPlayerLink == null) this.plugin.minecraftManager.kickPlayer(player.getUniqueId());

@@ -258,9 +258,13 @@ public class DiscordManager {
 
                             plugin.databaseManager.setLink(new PlayerLink(storedPlayerLink.discordID, javaUUID, bedrockUUID));
 
-                            UUID uuid = platformType == PlatformType.JAVA ? storedPlayerLink.javaUUID : storedPlayerLink.bedrockUUID;
-                            plugin.minecraftManager.setPlayerWhitelist(uuid, false);
-                            plugin.minecraftManager.kickPlayer(uuid);
+                            PUID puid = new PUID(
+                                    platformType == PlatformType.JAVA ? storedPlayerLink.javaUUID : storedPlayerLink.bedrockUUID,
+                                    platformType
+                            );
+
+                            plugin.minecraftManager.setPlayerWhitelist(puid, false);
+                            plugin.minecraftManager.kickPlayer(puid.uuid);
 
                             interaction.createImmediateResponder()
                                     .setContent("Unlinked your " + platform + " account.")
